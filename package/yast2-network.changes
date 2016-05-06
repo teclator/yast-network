@@ -1,9 +1,50 @@
 -------------------------------------------------------------------
-Fri Feb 23 09:56:48 UTC 2016 - knut.anderssen@suse.com
+Mon May  2 11:35:45 UTC 2016 - mfilka@suse.com
 
-- bsc#903190
-  - Recognized netcards with subclass 07 as InfiniBand (ib) which
-  now are not filtered out.
+- bnc#977953
+  - added dependency on yast2-proxy. "yast2 lan" won't fail with
+    internal error (missing Proxy module), when yast2-network is
+    installed into a minimal server installation.
+- 3.1.149
+
+-------------------------------------------------------------------
+Tue Apr 19 08:01:16 UTC 2016 - mfilka@suse.com
+
+- bnc#966694
+  - TigerVNC Viewer Error: No matching security types. Do not touch
+    VNC arguments when enabling or disabling it. Thanks to 
+    msrb@suse.com for the patch.
+- 3.1.148
+
+-------------------------------------------------------------------
+Tue Apr 12 08:04:07 UTC 2016 - mfilka@suse.com
+
+- bnc#974910
+  - fixed internal error when no "interfaces" group is found in an
+    AY profile
+- 3.1.147
+
+-------------------------------------------------------------------
+Mon Apr 11 09:42:20 UTC 2016 - mfilka@suse.com
+
+- bnc#955217, bnc#956605
+  - fixed internal error caused by the previous patch
+- 3.1.146
+
+-------------------------------------------------------------------
+Mon Apr  4 17:24:13 UTC 2016 - mfilka@suse.com
+
+- bnc#955217, bnc#956605
+  - unified udev rule handling by always doing it in the 1st stage
+    of installation.
+- 3.1.145
+
+-------------------------------------------------------------------
+Sun Mar  6 21:15:08 UTC 2016 - mfilka@suse.com
+
+- bnc#920089
+  - fix by Damir Porobic
+  - fixed layout of dialog for new route definition
 - 3.1.144
 
 -------------------------------------------------------------------
