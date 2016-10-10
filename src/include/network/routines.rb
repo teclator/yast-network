@@ -754,11 +754,6 @@ module Yast
       Run("ifdown #{dev_name}")
     end
 
-    # Tries to set the link up of all available interfaces
-    def SetAllLinksUp
-      GetAllInterfaces().each { |i| SetLinkUp(i) }
-    end
-
     # Checks if given device has carrier
     #
     # @return [boolean] true if device has carrier
