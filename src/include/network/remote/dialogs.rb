@@ -83,7 +83,7 @@ module Yast
               Remote.IsDisabled
             )
           ),
-          VSpacing(0.3),
+          VSpacing(1),
           Left(
             CheckBox(
               Id(:allow_web),
