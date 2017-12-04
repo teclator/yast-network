@@ -34,7 +34,10 @@ module Y2Remote
         textdomain "network"
 
         @allow_web ||= AllowWeb.new
-        @remote = Y2Remote::Remote.instance
+      end
+
+      def init
+        remote.disabled? ? @allow_web.disable : @allow_web.enable
       end
 
       def opt
@@ -45,7 +48,7 @@ module Y2Remote
         case event["ID"]
         when :disallow
           @allow_web.disable
-        when :allow_with_manager, :allow_without_vncmanager
+        when :allow_with_vncmanager, :allow_without_vncmanager
           @allow_web.enable
         end
 
@@ -53,14 +56,13 @@ module Y2Remote
       end
 
       def store
-        if disallow?
-          @remote.disable!
-          return
-        end
+        remote.disable!
 
-        allow_manager? ? @remote.enable_manager! : @remote.enable!
+        return if disallow?
 
-        @remote.enable_web! if allow_web?
+        allow_manager? ? remote.enable_mode(:manager) : remote.enable_mode(:vnc)
+
+        remote.enable_mode(:web) if allow_web?
 
         nil
       end
@@ -76,7 +78,7 @@ module Y2Remote
                 Id(:allow_with_vncmanager),
                 Opt(:notify),
                 _("&Allow Remote Administration With Session Management"),
-                Yast::Remote.IsEnabled && Yast::Remote.EnabledVncManager
+                remote.with_manager?
               )
             ),
             # RadioButton label
@@ -85,7 +87,7 @@ module Y2Remote
                 Id(:allow_without_vncmanager),
                 Opt(:notify),
                 _("&Allow Remote Administration Without Session Management"),
-                Yast::Remote.IsEnabled && !Yast::Remote.EnabledVncManager
+                remote.enabled? && !remote.with_manager?
               )
             ),
             # RadioButton label
@@ -94,7 +96,7 @@ module Y2Remote
                 Id(:disallow),
                 Opt(:notify),
                 _("&Do Not Allow Remote Administration"),
-                Yast::Remote.IsDisabled
+                remote.disabled?
               )
             ),
             VSpacing(1),
@@ -123,12 +125,18 @@ module Y2Remote
       end
     private
 
-      def disallow?
-        Yast::UI.QueryWidget(Id(:disallow), :Value)
+      # Convenience method for obtain a Y2Remote::Remote instance
+      #
+      # @return [Y2Remote::Remote] instance
+      def remote
+        @remote ||= Y2Remote::Remote.instance
       end
 
-      def allow?
-        !disallow?
+      # Return whether the disallow widget is checked
+      #
+      # @return [Boolean] true if checked
+      def disallow?
+        Yast::UI.QueryWidget(Id(:disallow), :Value)
       end
 
       def allow_without_manager?
@@ -136,14 +144,18 @@ module Y2Remote
       end
 
       def allow_manager?
-        Yast::UI.QueryWidget(Id(:allow_vncmanager), :Value)
+        Yast::UI.QueryWidget(Id(:allow_with_vncmanager), :Value)
       end
 
+      # Return whether the vnc web access checkbox has been checked
+      #
+      # @return [Boolean] true if the web access checkbox is checked
       def allow_web?
-        allow? && @allow_web.value
+        !disallow? && @allow_web.checked?
       end
     end
 
+    # Checkbox widget for setting vnc web access as enabled when checked.
     class AllowWeb < CWM::CheckBox
       def label
         _("Enable access using a &web browser")
@@ -152,12 +164,9 @@ module Y2Remote
       def opt
         [:notify]
       end
-
-      def init
-        self.disable if !Yast::Remote.IsEnabled
-      end
     end
 
+    # Widget for opening VNC services in the firewall
     class RemoteFirewall < CWM::CustomWidget
       attr_accessor :cwm_interfaces
       def initialize

@@ -1,5 +1,24 @@
 # encoding: utf-8
 
+# ------------------------------------------------------------------------------
+# Copyright (c) 2017 SUSE LLC
+#
+#
+# This program is free software; you can redistribute it and/or modify it under
+# the terms of version 2 of the GNU General Public License as published by the
+# Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program; if not, contact SUSE.
+#
+# To contact SUSE about this file by physical or electronic mail, you may find
+# current contact information at www.suse.com.
+# ------------------------------------------------------------------------------
+
 require "yast"
 require "y2remote/modes"
 
@@ -18,7 +37,11 @@ module Y2Remote
     # are applied on vnc1 even vnchttpd1 configuration
 
     # [Symbol] Remote administration mode, :disabled, :xvnc or :vncmanager
-    attr_accessor :modes
+    attr_reader :modes
+
+    attr_accessor :proposed
+
+    alias_method :proposed?, :proposed
 
     def initialize
       import_modules
@@ -26,7 +49,7 @@ module Y2Remote
       textdomain "network"
 
       @modes = []
-      @web_enabled = false
+      @proposed = false
     end
 
     # Checks if remote administration is currently allowed
@@ -36,34 +59,28 @@ module Y2Remote
 
     # Checks if remote administration is currently disallowed
     def disabled?
-      @modes.empty?
+      modes.empty?
     end
 
     def disable!
       @modes = []
     end
 
-    def enable!
-      @modes = [Y2Remote::Modes::VNC]
+    def enable_mode(mode)
+      @modes.delete(:vnc) if mode == :manager
+      @modes.delete(:manager) if mode == :vnc
+
+      @modes << mode
     end
 
-    def enable_manager!
-      @modes = [Y2Remote::Modes::Manager]
-    end
-
-    def enable_web!
-      @modes << [Y2Remote::Modes::Web]
+    def with_manager?
+      modes.include?(:manager)
     end
 
     # Read the current status
     # @return true on success
     def read
-      display_manager_remote_access =
-        Yast::SCR.Read(Yast.path(".sysconfig.displaymanager.DISPLAYMANAGER_REMOTE_ACCESS")) == "yes"
-
-      xdm = Yast::Service.Enabled(XDM_SERVICE_NAME)
-
-      if xdm && display_manager_remote_access
+      if xdm_enabled? && display_manager_remote_access?
         @modes = Y2Remote::Modes.running_modes
       end
 
@@ -73,16 +90,43 @@ module Y2Remote
     # Update the SCR according to network settings
     # @return true on success
     def write
+      steps = [_("Configure display manager")]
+      steps << _("Restart the services") if Yast::Mode.normal
+
+      caption = _("Saving Remote Administration Configuration")
+
+      Yast::Progress.New(caption, " ", steps.size, steps, [], "")
+      Yast::Progress.NextStage
+      Yast::Progress.Title(_("Configuring display manager..."))
       return false unless configure_display_manager
 
-      restart_services if Yast::Mode.normal
+      if Yast::Mode.normal
+        Yast::Progress.NextStage
+        Yast::Progress.Title(_("Restarting the service..."))
+        restart_services
+        Yast::Progress.NextStage
+      end
 
       true
     end
 
+    def reset!
+      Linuxrc.vnc ? enable! : disable!
+
+      log.info("Remote Administration was proposed as: #{modes.inspect}")
+
+      @proposed = true
+    end
+
+    def propose
+      return false if proposed?
+
+      reset!
+    end
+
     # Updates the VNC and xdm configuration
     #
-    # Called from #Write. Ensures that required packages are installed,
+    # Called from #write. Ensures that required packages are installed,
     # enables vnc services and xdm and writes the configuration files,
     # reporting any error in the process.
     #
@@ -90,17 +134,12 @@ module Y2Remote
     def configure_display_manager
       if enabled?
         # Install required packages
-        packages = @modes.map { |m| m.required_packages }
-
-        if !Yast::Package.InstallAll(packages)
+        if !Yast::Package.InstallAll(required_packages)
           log.error "Installing of required packages failed"
           return false
         end
 
-        Y2Remote::Modes.all.each do |mode|
-          @modes.include?(mode) ? mode.enable_service! : mode.disable_service!
-        end
-
+        Y2Remote::Modes.all.each { |m| modes.include?(m) ? m.enable! : m.disable! }
       end
 
       # Set DISPLAYMANAGER_REMOTE_ACCESS in sysconfig/displaymanager
@@ -114,7 +153,7 @@ module Y2Remote
       )
       Yast::SCR.Write(Yast.path(".sysconfig.displaymanager"), nil)
 
-       true
+      true
     end
 
     def restart_display_manager
@@ -141,9 +180,7 @@ module Y2Remote
     def restart_services
       Yast::SystemdTarget.set_default(GRAPHICAL_TARGET) if enabled?
 
-      Y2Remote::Modes.all.map do |mode|
-        @modes.include?(mode) ? mode.restart_service! : mode.stop_service!
-      end
+      Y2Remote::Modes.all { |m| modes.include?(m.to_sym) ? m.restart! : m.stop! }
 
       restart_display_manager if enabled?
     end
@@ -167,6 +204,20 @@ module Y2Remote
       Yast.import "Linuxrc"
       Yast.import "Message"
       Yast.import "SystemdTarget"
+    end
+
+    def required_packages
+      Y2Remote::Modes.all.map do |mode|
+        mode.required_packages if modes.include?(mode.to_sym)
+      end.compact.flatten
+    end
+
+    def display_manager_remote_access?
+      Yast::SCR.Read(Yast.path(".sysconfig.displaymanager.DISPLAYMANAGER_REMOTE_ACCESS")) == "yes"
+    end
+
+    def xdm_enabled?
+      Yast::Service.Enabled(XDM_SERVICE_NAME)
     end
   end
 end

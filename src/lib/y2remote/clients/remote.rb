@@ -30,7 +30,6 @@ module Y2Remote
 
       def initialize
         Yast.import "Label"
-        Yast.import "Remote"
         Yast.import "Wizard"
         Yast.import "Report"
         Yast.import "SuSEFirewall"
@@ -40,15 +39,18 @@ module Y2Remote
         Yast.import "UI"
 
         textdomain "network"
+      end
 
+      def remote
         @remote = Y2Remote::Remote.instance
-        @remote.read
-        Yast::SuSEFirewall.Read
       end
 
       def run
         log.info("----------------------------------------")
         log.info("Remote client started")
+
+        remote.read
+        Yast::SuSEFirewall.Read
 
         ret = Y2Remote::Dialogs::Remote.new.run
 
@@ -56,11 +58,14 @@ module Y2Remote
         Yast::Wizard.SetDesktopTitleAndIcon("remote")
         Yast::Wizard.SetNextButton(:next, Yast::Label.FinishButton)
 
-        @remote.write if ret == :next
+        remote.write if ret == :next
+
         Yast::Wizard.CloseDialog
 
         log.info("----------------------------------------")
         log.info("Remote client finished")
+
+        ret
       end
     end
   end

@@ -1,4 +1,4 @@
-# encoding: utf-8
+#!/usr/bin/env rspec
 
 # ------------------------------------------------------------------------------
 # Copyright (c) 2017 SUSE LLC
@@ -19,38 +19,10 @@
 # current contact information at www.suse.com.
 # ------------------------------------------------------------------------------
 
-require "yast"
-require "cwm/dialog"
-require "y2remote/widgets/remote"
+require_relative "../../../test_helper.rb"
+require "y2remote/dialogs/remote"
+require "cwm/rspec"
 
-module Y2Remote
-  module Dialogs
-    class Remote < CWM::Dialog
-      def title
-        _("Remote Administration")
-      end
-
-      def contents
-        HBox(
-          HStretch(),
-          VBox(
-            Frame(
-              # Dialog frame title
-              _("Remote Administration Settings"),
-              Widgets::RemoteSettings.new
-            ),
-            VSpacing(1),
-            Widgets::RemoteFirewall.new
-          ),
-          HStretch()
-        )
-      end
-
-    private
-
-      def should_open_dialog?
-        true
-      end
-    end
-  end
+describe Y2Remote::Dialogs::Remote do
+  include_examples "CWM::Dialog"
 end
