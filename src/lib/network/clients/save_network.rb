@@ -291,11 +291,15 @@ module Yast
       # that a bridge configuration is present in the profile it should be
       # skipped or even only done in case of missing `networking -> interfaces`
       # section
-      NetworkAutoconfiguration.instance.configure_virtuals
+      NetworkAutoconfiguration.instance.configure_virtuals if propose_virt_config?
       NetworkAutoconfiguration.instance.configure_dns unless Mode.autoinst
 
       # this depends on DNS configuration
       configure_hosts
+    end
+
+    def propose_virt_config?
+      Y2Network::ProposalSettings.instance.propose_bridge?
     end
 
     # It does an automatic configuration of installed system
